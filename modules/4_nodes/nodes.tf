@@ -89,6 +89,13 @@ EOF
   }
 }
 
+locals {
+    master = {
+        volume_count = lookup(var.master, "data_volume_count", 0),
+        volume_size  = lookup(var.master, "data_volume_size", 0)
+    }
+}
+
 resource "ibm_pi_instance" "master" {
   count = var.master["count"]
 
@@ -100,7 +107,11 @@ resource "ibm_pi_instance" "master" {
   pi_sys_type          = var.system_type
   pi_cloud_instance_id = var.service_instance_id
   pi_network_ids       = [data.ibm_pi_network.network.id]
-  pi_volume_ids        = var.master_volume_size == "" ? null : ibm_pi_volume.master[count.index].*.volume_id
+#  pi_volume_ids        = var.master_volume_size == "" ? null : ibm_pi_volume.master[count.index].*.volume_id
+# pi_volume_ids           = local.master.volume_count == 0 ? null : chunklist("ibm_pi_volume.master[range(5)].*.volume_id", 3)
+# pi_volume_ids           = local.master.volume_count  == 0 ? null : chunklist(ibm_pi_volume.master.*.volume_id[range(5)], 3)
+  pi_volume_ids           = local.master.volume_count == 0 ? null : (chunklist(ibm_pi_volume.master, 3))[count.index].volume_id
+
 
   # Inject ignition source timeout to force ignition fail when HTTP file is not available for 500s. This will reboot the node and try ignition fetch process again.
   pi_user_data = base64encode(replace(data.ignition_config.master[count.index].rendered, "\"timeouts\":{}", "\"timeouts\":{\"httpTotal\":500}"))
@@ -111,9 +122,11 @@ resource "ibm_pi_instance" "master" {
 }
 
 resource "ibm_pi_volume" "master" {
-  count = var.master_volume_size == "" ? 0 : var.master["count"]
+#  count = var.master_volume_size == "" ? 0 : var.master["count"]
+  count = local.master.volume_count * var.master["count"]
 
-  pi_volume_size       = var.master_volume_size
+#  pi_volume_size       = var.master_volume_size
+  pi_volume_size       = local.master.volume_size
   pi_volume_name       = "${var.name_prefix}-master-${count.index}-volume"
   pi_volume_type       = data.ibm_pi_image.rhcos.storage_type
   pi_volume_shareable  = var.volume_shareable
@@ -143,6 +156,13 @@ data "ignition_config" "worker" {
   files = [data.ignition_file.w_hostname[count.index].rendered]
 }
 
+locals {
+    worker = {
+        volume_count = lookup(var.worker, "data_volume_count", 0),
+        volume_size  = lookup(var.worker, "data_volume_size", 0)
+    }
+
+
 resource "ibm_pi_instance" "worker" {
   count = var.worker["count"]
 
@@ -154,7 +174,8 @@ resource "ibm_pi_instance" "worker" {
   pi_sys_type          = var.system_type
   pi_cloud_instance_id = var.service_instance_id
   pi_network_ids       = [data.ibm_pi_network.network.id]
-  pi_volume_ids        = var.worker_volume_size == "" ? null : ibm_pi_volume.worker[count.index].*.volume_id
+#  pi_volume_ids        = var.worker_volume_size == "" ? null : ibm_pi_volume.worker[count.index].*.volume_id
+  pi_volume_ids        = local.worker.volume_count == 0 ? null : chunklist("ibm_pi_volume.worker[count.index].*.volume_id", local.worker.volume_count)
 
   # Inject ignition source timeout to force ignition fail when HTTP file is not available for 500s. This will reboot the node and try ignition fetch process again.
   pi_user_data = base64encode(replace(data.ignition_config.worker[count.index].rendered, "\"timeouts\":{}", "\"timeouts\":{\"httpTotal\":500}"))
@@ -195,9 +216,11 @@ EOF
 }
 
 resource "ibm_pi_volume" "worker" {
-  count = var.worker_volume_size == "" ? 0 : var.worker["count"]
+#  count = var.worker_volume_size == "" ? 0 : var.worker["count"]
+  count = local.worker.volume_count * var.worker["count"]
 
-  pi_volume_size       = var.worker_volume_size
+#  pi_volume_size       = var.worker_volume_size
+  pi_volume_size       = local.worker.volume_size
   pi_volume_name       = "${var.name_prefix}-worker-${count.index}-volume"
   pi_volume_type       = data.ibm_pi_image.rhcos.storage_type
   pi_volume_shareable  = var.volume_shareable

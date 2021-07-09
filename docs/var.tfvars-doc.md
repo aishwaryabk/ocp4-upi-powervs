@@ -312,12 +312,6 @@ volume_size                 = "300" # Value in GB
 volume_shareable            = false
 ```
 
-If you need to attach additional data volumes to the OpenShift cluster nodes use the following variables.
-```
-master_volume_size          = "500"
-worker_volume_size          = "500"
-```
-
 The following variables are specific to upgrading an existing installation.
 ```
 upgrade_version    = ""
